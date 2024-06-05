@@ -1,5 +1,5 @@
-# INIF
-Code for 'Implicit Neural Image Field for Biological Microscopy Image Compression' 
+# SAN-PEFT
+Code for 'Neuron and Synapse: Discovering LTD and LTP effects on Parameter Efficient Fine-tuning' 
 
 ## Installation
 First clone the repository by 
