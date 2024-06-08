@@ -576,7 +576,7 @@ args_input = [
     '--min-lr', '1e-8',
     '--gpu_id', '0',
     '--batch-size', '64',
-    '--tuning-mode', 'with_norm',
+    '--tuning-mode', 'base_norm',
     '--output', '/home/cqzeng/SAN/output',
     '--wandb', '97e85839e66b93ae618156c2b468f818d4348745',
 ]
@@ -589,27 +589,27 @@ if __name__ == '__main__':
                     "stanfordcars_196"
                     ]
     VTAB1k_DATASET = [
-        "cifar_100",
-        # "caltech_102",
-        "dtd_47",
-        "oxford_flowers_102",
-        "oxford_iiit_pets_37",
-        # "svhn_10",
-        # "sun_397",  # Natural
-        # "dmlab_6",
-        # "dsprites_ori_16",
-        # "patch_camelyon_2",
-        "eurosat_10",
-        "resisc_45",
-        "diabetic_retinopathy_5",  # Specialized
-        # "clevr_count_8",
-        # "clevr_dist_8",
-        # "dmlab_6",
-        # # "kitti_2",
-        # "dsprites_loc_16",
-        # "dsprites_ori_16",
-        # "smallnorb_azi_18",
-        # "smallnorb_ele_18"  # Structured
+        "clevr_count_8",
+        "clevr_dist_8",
+        "dmlab_6",
+        # "kitti_2",
+        "dsprites_loc_16",
+        "dsprites_ori_16",
+        "smallnorb_azi_18",
+        "smallnorb_ele_18"  # Structured
+        # "cifar_100",
+        "caltech_102",
+        # "dtd_47",
+        # "oxford_flowers_102",
+        # "oxford_iiit_pets_37",
+        "svhn_10",
+        "sun_397",  # Natural
+        "dmlab_6",
+        "dsprites_ori_16",
+        "patch_camelyon_2",
+        # "eurosat_10",
+        # "resisc_45",
+        # "diabetic_retinopathy_5",  # Specialized
         ]
     for dataset in VTAB1k_DATASET:
         for lr in [0.005, 0.0025, 0.001, 0.0005]:
