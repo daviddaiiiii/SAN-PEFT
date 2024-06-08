@@ -379,13 +379,11 @@ class Adaptation(nn.Module):
         print("8888888888888888888888888888888888 Init model Structure 88888888888888888888888888888888888888888")
         total_param_num = sum([m.numel() for m in self.model.parameters()])
         trainable_params = {}
-        for name, module in self.model.named_children():
-            module_len = len(list(module.children()))
-            print(f'The name of the module: {name}, the number of submodules: {module_len}')
-            if name == 'head':
-                for param in module.parameters():
+        for name, param in self.model.named_parameters():
+            print(f'The name of the module: {name}')
+            if 'head' in name or 'norm' in name:
                     param.requires_grad = True
-                trainable_params[name] = sum([m.numel() for m in module.parameters() if m.requires_grad])/total_param_num*100
+                    trainable_params[name] = param.numel()/total_param_num*100
         print(f'Model parameters count (synapse):  {total_param_num}')
         print(f'Trainable parameters {trainable_params}, total: {sum(trainable_params.values()):.4f} (%)')
         print("8888888888888888888888888888888888 adapt module init 88888888888888888888888888888888888888888")
@@ -421,7 +419,7 @@ class Adaptation(nn.Module):
     def forward_head_only(self, x):
         return self.model(x)
     
-    def forward(self, x, nt_sp_both = 'both'):
+    def forward(self, x, nt_sp_both = 'nt'):
         B, C, H, W = x.shape
         _assert(H == self.model.patch_embed.img_size[0], f"Input image height ({H}) doesn't match model ({self.model.patch_embed.img_size[0]}).")
         _assert(W == self.model.patch_embed.img_size[1], f"Input image width ({W}) doesn't match model ({self.model.patch_embed.img_size[1]}).")
@@ -467,7 +465,7 @@ class Adaptation(nn.Module):
 
 
 def main(args, args_text):
-    run_name = f"{args.data_dir.split('/')[-1]}_{args.dataset[0]}_{args.lr}_{args.warmup_lr}_{args.model}"
+    run_name = f"{args.data_dir.split('/')[-1]}_{args.dataset[0]}_{args.lr}_{args.warmup_lr}_{args.model}_{args.tuning_mode}"
     out_dir = os.path.join(args.output, run_name)
     # skip if output dir exists
     if os.path.exists(out_dir):
@@ -544,10 +542,10 @@ def main(args, args_text):
                            'Val_loss_head_only': val_loss_head_only, 'Val_acc_head_only': val_acc_head_only,
                            'epoch': epoch,
                            'Best result': best_result})
-                if epoch == 0 or epoch == args.epochs:
-                    artifact = wandb.Artifact(run_name, type='model')
-                    artifact.add_file(out_path)
-                    wandb.log_artifact(artifact)
+                # if epoch == 0 or epoch == args.epochs:
+                #     artifact = wandb.Artifact(run_name, type='model')
+                #     artifact.add_file(out_path)
+                #     wandb.log_artifact(artifact)
                 
         print(f"Best result: 'Val_loss': {best_result['Val_loss']:.4f}, 'Val_acc': {best_result['Val_acc']:.4f}%, 'epoch': {best_result['epoch']}, 'lr': {best_result['lr']}")
         print(f"Epoch {epoch+1}/{args.epochs}")
@@ -578,8 +576,9 @@ args_input = [
     '--min-lr', '1e-8',
     '--gpu_id', '0',
     '--batch-size', '64',
+    '--tuning-mode', 'with_norm',
     '--output', '/home/cqzeng/SAN/output',
-    # '--wandb', '97e85839e66b93ae618156c2b468f818d4348745',
+    '--wandb', '97e85839e66b93ae618156c2b468f818d4348745',
 ]
 
 if __name__ == '__main__':
@@ -591,34 +590,34 @@ if __name__ == '__main__':
                     ]
     VTAB1k_DATASET = [
         "cifar_100",
-        "caltech_102",
+        # "caltech_102",
         "dtd_47",
         "oxford_flowers_102",
         "oxford_iiit_pets_37",
-        "svhn_10",
-        "sun_397",  # Natural
-        "dmlab_6",
-        "dsprites_ori_16",
-        "patch_camelyon_2",
+        # "svhn_10",
+        # "sun_397",  # Natural
+        # "dmlab_6",
+        # "dsprites_ori_16",
+        # "patch_camelyon_2",
         "eurosat_10",
         "resisc_45",
         "diabetic_retinopathy_5",  # Specialized
-        "clevr_count_8",
-        "clevr_dist_8",
-        "dmlab_6",
-        "kitti_2",
-        "dsprites_loc_16",
-        "dsprites_ori_16",
-        "smallnorb_azi_18",
-        "smallnorb_ele_18"  # Structured
+        # "clevr_count_8",
+        # "clevr_dist_8",
+        # "dmlab_6",
+        # # "kitti_2",
+        # "dsprites_loc_16",
+        # "dsprites_ori_16",
+        # "smallnorb_azi_18",
+        # "smallnorb_ele_18"  # Structured
         ]
     for dataset in VTAB1k_DATASET:
         for lr in [0.005, 0.0025, 0.001, 0.0005]:
             for warmup_lr_ratio in [0.5, 0.25, 0.1]:
                     args_input[3] = dataset
                     args_input[5] = dataset.split('_')[-1]
-                    args_input[13] = str(lr)
-                    args_input[15] = str(warmup_lr_ratio*lr)
+                    args_input[15] = str(lr)
+                    args_input[17] = str(warmup_lr_ratio*lr)
                     args, args_text = _parse_args(args_input)
                     torch.cuda.set_device(f'cuda:{args.gpu_id}')
                     main(args, args_text)

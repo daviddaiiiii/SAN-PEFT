@@ -232,13 +232,7 @@ def validate(model, loader, loss_fn, args):
     model.eval()  # 设置模型为评估模式
     running_loss = 0.0
     correct, total = 0, 0
-    
-    running_loss_nt_only = 0.0
-    correct_nt_only, total_nt_only = 0, 0
-    
-    running_loss_sp_only = 0.0
-    correct_sp_only, total_sp_only = 0, 0
-    
+
     running_loss_head_only = 0.0
     correct_head_only, total_head_only = 0, 0
     with torch.no_grad():
@@ -252,20 +246,6 @@ def validate(model, loader, loss_fn, args):
             total += targets.size(0)
             correct += (predicted == targets).sum().item()
             
-            outputs_nt_only= model.forward(inputs, nt_sp_both = 'nt')
-            loss_nt_only = loss_fn(outputs_nt_only, targets)
-            running_loss_nt_only += loss_nt_only.item()
-            _, predicted_wo_wa = torch.max(outputs_nt_only.data, 1)
-            total_nt_only += targets.size(0)
-            correct_nt_only += (predicted_wo_wa == targets).sum().item()
-            
-            outputs_sp_only = model.forward(inputs, nt_sp_both = 'sp')
-            loss_sp_only = loss_fn(outputs_sp_only, targets)
-            running_loss_sp_only += loss_sp_only.item()
-            _, predicted_sp_only = torch.max(outputs_sp_only.data, 1)
-            total_sp_only += targets.size(0)
-            correct_sp_only += (predicted_sp_only == targets).sum().item()
-            
             outputs_head_only = model.forward_head_only(inputs)
             loss_head_only = loss_fn(outputs_head_only, targets)
             running_loss_head_only += loss_head_only.item()
@@ -277,40 +257,25 @@ def validate(model, loader, loss_fn, args):
     avg_loss = running_loss / len(loader)
     accuracy = 100 * correct / total
     
-    avg_loss_nt_only = running_loss_nt_only / len(loader)
-    accuracy_nt_only = 100 * correct_nt_only / total_nt_only
-    
-    avg_loss_sp_only = running_loss_sp_only / len(loader)
-    accuracy_sp_only = 100 * correct_sp_only / total_sp_only
-    
     avg_loss_head_only = running_loss_head_only / len(loader)
     accuracy_head_only = 100 * correct_head_only / total_head_only
 
-    return avg_loss, accuracy, avg_loss_nt_only, accuracy_nt_only, avg_loss_sp_only, accuracy_sp_only, avg_loss_head_only, accuracy_head_only
+    return avg_loss, accuracy, avg_loss_head_only, accuracy_head_only
 
-
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import matplotlib.pyplot as plt
-import numpy as np
 
 class neurotransmitter(nn.Module):
     '''
-    This class initializes a trainable tensor to simulate the effect of neurotransmitter.
+    This class initialize a trainable tensor to simulate the effect of neurotransmitter.
     self.scale: trainable tensor
     return: x * self.scale
     '''
     def __init__(self, input_dim):
         super(neurotransmitter, self).__init__()
         self.scale = nn.Parameter(torch.ones(input_dim))
-    
     def forward(self, x):
         return x * self.scale
-    
     def __repr__(self):
         return f"{self.__class__.__name__}(scale shape: {self.scale.shape})"
-    
     def visualize(self, save_path=None):
         scale = self.scale.detach().cpu().numpy()
         if scale.ndim == 1:
@@ -345,9 +310,9 @@ class synapse_plasticity(nn.Module):
             self.func_type = nn.functional.linear
         elif self.weight.dim() == 4:
             self.func_type = nn.functional.conv2d
-        if presynapse:
-            self.presynapse = presynapse
-            self.LTD_LTP = LTD_LTP(self.weight_shape[1])
+        self.presynapse = presynapse
+        if self.presynapse:
+            self.LTD_LTP = LTD_LTP(self.presynapse.scale.shape[0])
         self.postsynapse = neurotransmitter(self.weight_shape[0])
     
     def forward(self, x, nt_sp_both = 'both'):
@@ -357,13 +322,9 @@ class synapse_plasticity(nn.Module):
             return x
         else: 
             weight = self.weight.clone()
-            if self.presynapse:
-                if self.presynapse.scale.shape[0] != self.weight_shape[1]:
-                    presynapse_value = self.resize(self.presynapse.scale.clone(), self.weight_shape[1])
-                    presynapse_value = self.smooth(presynapse_value)
-                    scale = self.LTD_LTP(presynapse_value)
-                else:
-                    scale = self.LTD_LTP(self.presynapse.scale)
+            if self.presynapse is not None:
+                scale = self.presynapse.scale
+                scale = self.LTD_LTP(scale)
                 weight *= scale
             x = self.func_type(x, weight, self.bias)
             if nt_sp_both == 'both':
@@ -380,38 +341,6 @@ class synapse_plasticity(nn.Module):
         repr_str += ")"
         return repr_str
 
-    def resize(self, value, new_size):
-        '''
-        Resize self.scale to new_size using linear interpolation.
-        
-        Parameters:
-        new_size (int): The desired length to resize self.scale to.
-        
-        Returns:
-        torch.Tensor: The resized scale tensor.
-        '''
-        scale_np = value.reshape(1, 1, -1)  # Reshape to (N, C, L) for interpolation
-        scale_resized = F.interpolate(scale_np, size=new_size, mode='linear', align_corners=True)
-        return scale_resized.view(-1)
-    
-    def smooth(self, value, window_size=1):
-        '''
-        Smooth self.scale by averaging values in a sliding window.
-        
-        Parameters:
-        window_size (int): The size of the window for smoothing.
-        
-        Returns:
-        torch.Tensor: The smoothed scale tensor.
-        '''
-        if window_size <= 1:
-            return value
-        
-        scale_np = value.detach().cpu().numpy()
-        padded_scale = np.pad(scale_np, (window_size // 2, window_size // 2), mode='reflect')
-        smoothed_scale = np.convolve(padded_scale, np.ones(window_size)/window_size, mode='valid')
-        
-        return torch.tensor(smoothed_scale, dtype=torch.float32).cuda()
 
 class Adaptation(nn.Module):
     def __init__(self, model: nn.Module):
@@ -440,7 +369,6 @@ class Adaptation(nn.Module):
                                                     )
             block.attn.proj.ada = synapse_plasticity(block.attn.proj.weight,
                                                     block.attn.proj.bias,
-                                                    block.attn.qkv.ada.postsynapse
                                                     ) # type: ignore
             block.mlp.fc1.ada = synapse_plasticity(block.mlp.fc1.weight,
                                                     block.mlp.fc1.bias,
@@ -460,13 +388,12 @@ class Adaptation(nn.Module):
         for name, param in self.model.named_parameters():
             if param.requires_grad:
                 trainable_param_num += param.numel()
-                print(f'Trainable parameters: {name}, shape: {param.shape}')
         print(f'Trainable parameters total: {trainable_param_num/total_param_num*100:.4f} (%)')
     
     def forward_head_only(self, x):
         return self.model(x)
     
-    def forward(self, x, nt_sp_both = 'both'):
+    def forward(self, x, nt_sp_both = 'nt'):
         B, C, H, W = x.shape
         _assert(H == self.model.patch_embed.img_size[0], f"Input image height ({H}) doesn't match model ({self.model.patch_embed.img_size[0]}).")
         _assert(W == self.model.patch_embed.img_size[1], f"Input image width ({W}) doesn't match model ({self.model.patch_embed.img_size[1]}).")
@@ -551,10 +478,8 @@ def main(args, args_text):
     best_result = {'Val_loss': 100, 'Val_acc': 0, 'epoch': 0, 'lr': 0, 'state_dict': model.state_dict()}
     for epoch in range(args.epochs+1):
         if epoch % 20 == 0:
-            val_loss, val_acc, val_loss_nt_only, val_acc_nt_only, val_loss_sp_only, val_acc_sp_only, val_loss_head_only, val_acc_head_only = validate(model, loader_eval, validate_loss_fn, args)
+            val_loss, val_acc, val_loss_head_only, val_acc_head_only = validate(model, loader_eval, validate_loss_fn, args)
             print(f"Validation loss: {val_loss:.4f}, Validation accuracy: {val_acc:.4f}%")
-            print(f"Validation loss (neurotransmitter only): {val_loss_nt_only:.4f}, Validation accuracy (neurotransmitter only): {val_acc_nt_only:.4f}%")
-            print(f"Validation loss (synapse only): {val_loss_sp_only:.4f}, Validation accuracy (synapse only): {val_acc_sp_only:.4f}%")
             print(f"Validation loss (head only): {val_loss_head_only:.4f}, Validation accuracy (head only): {val_acc_head_only:.4f}%")
             if best_result['Val_acc'] < val_acc:
                 best_result['Val_loss'] = val_loss
@@ -584,15 +509,13 @@ def main(args, args_text):
             
             if args.wandb:
                 wandb.log({'Val_loss': val_loss, 'Val_acc': val_acc,
-                           'Val_loss_nt_only': val_loss_nt_only, 'Val_acc_nt_only': val_acc_nt_only,
-                           'Val_loss_sp_only': val_loss_sp_only, 'Val_acc_sp_only': val_acc_sp_only,
                            'Val_loss_head_only': val_loss_head_only, 'Val_acc_head_only': val_acc_head_only,
                            'epoch': epoch,
                            'Best result': best_result})
                 # if epoch == 0 or epoch == args.epochs:
-                    # artifact = wandb.Artifact(run_name, type='model')
-                    # artifact.add_file(out_path)
-                    # wandb.log_artifact(artifact)
+                #     artifact = wandb.Artifact(run_name, type='model')
+                #     artifact.add_file(out_path)
+                #     wandb.log_artifact(artifact)
                 
         print(f"Best result: 'Val_loss': {best_result['Val_loss']:.4f}, 'Val_acc': {best_result['Val_acc']:.4f}%, 'epoch': {best_result['epoch']}, 'lr': {best_result['lr']}")
         print(f"Epoch {epoch+1}/{args.epochs}")
@@ -621,9 +544,9 @@ args_input = [
     '--warmup-lr', '0.0005',
     '--warmup-epochs', '10',
     '--min-lr', '1e-8',
-    '--gpu_id', '0',
+    '--gpu_id', '3',
     '--batch-size', '64',
-    '--tuning-mode', 'resize_norm',
+    '--tuning-mode', 'nt_only',
     '--output', '/home/cqzeng/SAN/output',
     '--wandb', '97e85839e66b93ae618156c2b468f818d4348745',
 ]
@@ -636,27 +559,27 @@ if __name__ == '__main__':
                     "stanfordcars_196"
                     ]
     VTAB1k_DATASET = [
-        # "cifar_100",
-        "caltech_102", ##
-        # "dtd_47",
-        # "oxford_flowers_102",
-        # "oxford_iiit_pets_37",
-        "svhn_10", ##
-        "sun_397",  # Natural ##
-        "dmlab_6", ##
-        "dsprites_ori_16", ##
-        "patch_camelyon_2", ##
-        # "eurosat_10",
-        # "resisc_45",
-        # "diabetic_retinopathy_5",  # Specialized
-        "clevr_count_8", ##
-        "clevr_dist_8", ##
-        "dmlab_6", ##
-        # "kitti_2", ##
-        "dsprites_loc_16", ##
-        "dsprites_ori_16", ##
-        "smallnorb_azi_18", ##
-        "smallnorb_ele_18"  # Structured ##
+        "cifar_100",
+        "caltech_102",
+        "dtd_47",
+        "oxford_flowers_102",
+        "oxford_iiit_pets_37",
+        "svhn_10",
+        "sun_397",  # Natural
+        "dmlab_6",
+        "dsprites_ori_16",
+        "patch_camelyon_2",
+        "eurosat_10",
+        "resisc_45",
+        "diabetic_retinopathy_5",  # Specialized
+        "clevr_count_8",
+        "clevr_dist_8",
+        "dmlab_6",
+        # "kitti_2",
+        "dsprites_loc_16",
+        "dsprites_ori_16",
+        "smallnorb_azi_18",
+        "smallnorb_ele_18"  # Structured
         ]
     for dataset in VTAB1k_DATASET:
         for lr in [0.005, 0.0025, 0.001, 0.0005]:
