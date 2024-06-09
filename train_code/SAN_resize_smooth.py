@@ -204,7 +204,7 @@ def train(model, loader, optimizer, loss_fn, lr_scheduler, args):
         if args.mixup_fn is not None:
             inputs, targets = args.mixup_fn(inputs, targets)
         inputs, targets = inputs.cuda(), targets.cuda()
-        outputs = model(inputs)
+        outputs = model(inputs, nt_sp_both = args.train_mode)
         main_loss = loss_fn(outputs, targets)
         aux_loss, counter = 0, 0
         for module in model.modules():
@@ -345,8 +345,8 @@ class synapse_plasticity(nn.Module):
             self.func_type = nn.functional.linear
         elif self.weight.dim() == 4:
             self.func_type = nn.functional.conv2d
+        self.presynapse = presynapse
         if presynapse:
-            self.presynapse = presynapse
             self.LTD_LTP = LTD_LTP(self.weight_shape[1])
         self.postsynapse = neurotransmitter(self.weight_shape[0])
     
@@ -624,6 +624,7 @@ args_input = [
     '--gpu_id', '1',
     '--batch-size', '64',
     '--tuning-mode', 'resize_norm',
+    '--train-mode', 'both',
     '--output', '/home/cqzeng/SAN/output',
     '--wandb', '97e85839e66b93ae618156c2b468f818d4348745',
 ]

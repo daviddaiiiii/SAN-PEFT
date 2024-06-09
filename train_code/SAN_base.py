@@ -204,7 +204,7 @@ def train(model, loader, optimizer, loss_fn, lr_scheduler, args):
         if args.mixup_fn is not None:
             inputs, targets = args.mixup_fn(inputs, targets)
         inputs, targets = inputs.cuda(), targets.cuda()
-        outputs = model(inputs)
+        outputs = model(inputs, nt_sp_both = args.train_mode)
         main_loss = loss_fn(outputs, targets)
         aux_loss, counter = 0, 0
         for module in model.modules():
@@ -338,7 +338,7 @@ class synapse_plasticity(nn.Module):
             self.func_type = nn.functional.conv2d
         self.presynapse = presynapse
         if self.presynapse:
-            self.LTD_LTP = LTD_LTP(self.presynapse.scale.shape[0])
+            self.LTD_LTP = LTD_LTP(self.weight_shape[1])
         self.postsynapse = neurotransmitter(self.weight_shape[0])
     
     def forward(self, x, nt_sp_both = 'both'):
@@ -350,7 +350,7 @@ class synapse_plasticity(nn.Module):
             weight = self.weight.clone()
             if self.presynapse is not None:
                 scale = self.presynapse.scale
-                scale = self.LTD_LTP(scale)
+                # scale = self.LTD_LTP(scale)
                 weight *= scale
             x = self.func_type(x, weight, self.bias)
             if nt_sp_both == 'both':
@@ -419,7 +419,7 @@ class Adaptation(nn.Module):
     def forward_head_only(self, x):
         return self.model(x)
     
-    def forward(self, x, nt_sp_both = 'nt'):
+    def forward(self, x, nt_sp_both = 'both'):
         B, C, H, W = x.shape
         _assert(H == self.model.patch_embed.img_size[0], f"Input image height ({H}) doesn't match model ({self.model.patch_embed.img_size[0]}).")
         _assert(W == self.model.patch_embed.img_size[1], f"Input image width ({W}) doesn't match model ({self.model.patch_embed.img_size[1]}).")
@@ -576,7 +576,8 @@ args_input = [
     '--min-lr', '1e-8',
     '--gpu_id', '0',
     '--batch-size', '64',
-    '--tuning-mode', 'base_norm',
+    '--tuning-mode', 'base_norm_direct_reapply',
+    '--train-mode', 'both',
     '--output', '/home/cqzeng/SAN/output',
     '--wandb', '97e85839e66b93ae618156c2b468f818d4348745',
 ]

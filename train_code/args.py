@@ -73,8 +73,6 @@ parser.add_argument('--grad-checkpointing', action='store_true', default=False,
 
 
 # finetuning
-parser.add_argument('--tuning-mode', default='', type=str,
-                    help='Method of fine-tuning (default: None')
 parser.add_argument('--contrastive', action='store_true', default=False,
                     help='Weather to use contrastive learning (default: False)')
 parser.add_argument('--evaluate', action='store_true', default=False,
@@ -226,6 +224,11 @@ parser.add_argument('--wandb', default=None, type=str,
                     help='log training and validation metrics to wandb')
 parser.add_argument("--gpu_id", default="", help="gpu id")
 
+# SAN config
+parser.add_argument('--tuning-mode', default='', type=str,
+                    help='Descriptions of method for fine-tuning (default: None')
+parser.add_argument('--train-mode', default='both', type=str,
+                    help='Method of fine-tuning (default: both, options: nt, sp) ')
 
 
 def _parse_args(args_input=None):
