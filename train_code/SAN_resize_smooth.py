@@ -450,10 +450,6 @@ class Adaptation(nn.Module):
                                                     block.mlp.fc2.bias,
                                                     block.mlp.fc1.ada.postsynapse
                                                     )
-        self.model.head.ada = synapse_plasticity(self.model.head.weight,
-                                                self.model.head.bias,
-                                                self.model.blocks[-1].mlp.fc2.ada.postsynapse
-                                                )
         print("8888888888888888888888888888888888 init finish 88888888888888888888888888888888888888888")
         print(self.model)
         trainable_param_num = 0
@@ -506,7 +502,7 @@ class Adaptation(nn.Module):
         if self.model.global_pool:
             x = x[:, self.model.num_tokens:].mean(dim=1) if self.model.global_pool == 'avg' else x[:, 0]
       
-        x = self.model.head.ada(x, nt_sp_both)
+        x = self.model.head(x)
         return x
             
 
@@ -621,9 +617,9 @@ args_input = [
     '--warmup-lr', '0.0005',
     '--warmup-epochs', '10',
     '--min-lr', '1e-8',
-    '--gpu_id', '1',
+    '--gpu_id', '3',
     '--batch-size', '64',
-    '--tuning-mode', 'resize_norm',
+    '--tuning-mode', 'resize_norm_nohead',
     '--train-mode', 'both',
     '--output', '/home/cqzeng/SAN/output',
     '--wandb', '97e85839e66b93ae618156c2b468f818d4348745',
@@ -645,23 +641,24 @@ if __name__ == '__main__':
         "dsprites_ori_16",
         "smallnorb_azi_18",
         "smallnorb_ele_18"  # Structured
-        # "cifar_100",
+        "cifar_100",
         "caltech_102",
-        # "dtd_47",
-        # "oxford_flowers_102",
-        # "oxford_iiit_pets_37",
+        "dtd_47",
+        "oxford_flowers_102",
+        "oxford_iiit_pets_37",
         "svhn_10",
         "sun_397",  # Natural
         "dmlab_6",
         "dsprites_ori_16",
         "patch_camelyon_2",
-        # "eurosat_10",
-        # "resisc_45",
-        # "diabetic_retinopathy_5",  # Specialized
+        "eurosat_10",
+        "resisc_45",
+        "diabetic_retinopathy_5",  # Specialized
         ]
     for dataset in VTAB1k_DATASET:
-        for lr in [0.005, 0.0025, 0.001, 0.0005]:
-            for warmup_lr_ratio in [0.5, 0.25, 0.1]:
+        for lr in [0.01, 0.005, 0.0025, 0.001, 0.0005]:
+            # for warmup_lr_ratio in [0.5, 0.25, 0.1]:
+            for warmup_lr_ratio in [0.1]:
                     args_input[3] = dataset
                     args_input[5] = dataset.split('_')[-1]
                     args_input[15] = str(lr)

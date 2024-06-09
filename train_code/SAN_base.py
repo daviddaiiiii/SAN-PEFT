@@ -404,10 +404,6 @@ class Adaptation(nn.Module):
                                                     block.mlp.fc2.bias,
                                                     block.mlp.fc1.ada.postsynapse
                                                     )
-        self.model.head.ada = synapse_plasticity(self.model.head.weight,
-                                                self.model.head.bias,
-                                                self.model.blocks[-1].mlp.fc2.ada.postsynapse
-                                                )
         print("8888888888888888888888888888888888 init finish 88888888888888888888888888888888888888888")
         print(self.model)
         trainable_param_num = 0
@@ -459,7 +455,7 @@ class Adaptation(nn.Module):
         if self.model.global_pool:
             x = x[:, self.model.num_tokens:].mean(dim=1) if self.model.global_pool == 'avg' else x[:, 0]
       
-        x = self.model.head.ada(x, nt_sp_both)
+        x = self.model.head(x)
         return x
             
 
